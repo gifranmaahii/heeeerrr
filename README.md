@@ -64,7 +64,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `HERMES_LLM_MODE` | `nine_router` | ❌ (default) | Otak LLM: `nine_router` (gratis) atau `openrouter` |
 | `HERMES_NINEROUTER_BASE_URL` | `http://nine-router.railway.internal:20128/v1` | ❌ (default) | Alamat 9Router lewat private networking Railway |
 | `HERMES_NINEROUTER_API_KEY` | `9r_xxxxxxxx` | ✅ (mode 9Router) | API key dari dashboard 9Router (lihat bawah) |
-| `HERMES_MODEL` | `kr/claude-sonnet-4.5` | opsional | Model 9Router yang dipakai Hermes |
+| `HERMES_MODEL` | `kr/claude-sonnet-4.5` | opsional | Model 9Router yang dipakai Hermes. Contoh DeepSeek gratis: `kr/deepseek-3.2` (via Kiro) |
 | `OPENROUTER_API_KEY` | `sk-or-v1-...` | ❌ | Hanya untuk mode `openrouter` |
 | `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram tambahan, **pisahkan dengan koma**. ID `7597390816` sudah otomatis di-whitelist oleh `hermes_setup.sh` (digabung, bukan menimpa — ID lama jangan dihapus). Kosong = semua orang bisa chat bot |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |
@@ -124,6 +124,26 @@ Bot ini default-nya pakai **[9Router](https://github.com/decolua/9router)** — 
    - Buka bot Telegram kamu → klik **Start** → mulai chat. 🎉
 
 > Model default yang diminta Hermes dari 9Router: `kr/claude-sonnet-4.5`. Ganti lewat variabel `HERMES_MODEL`. Daftar model ada di dashboard 9Router: `cc/...`, `kr/...`, `if/...`, `qw/...`, `glm/...` dll. Kalau satu model limit, 9Router otomatis fallback ke model berikutnya.
+
+### 🐬 Pakai DeepSeek (gratis via Kiro)
+
+1. Pastikan provider **Kiro** masih **Connected** di dashboard 9Router.
+2. Railway → service `hermes-free-vps` → **Variables** → set:
+   ```
+   HERMES_MODEL = kr/deepseek-3.2
+   ```
+3. **Redeploy** → tes chat bot.
+
+> ⚠️ **Error "The model provider failed after retries"?** Itu artinya 9Router gagal mengeksekusi model yang diminta — biasanya karena: (1) model ID salah/typo (harus persis seperti di dashboard, dengan prefix `kr/`, `cc/`, dll), (2) **provider-nya belum di-Connect** di dashboard 9Router, (3) kuota provider habis, atau (4) OAuth token provider expired → dashboard 9Router → Providers → **Reconnect**. Detail error asli ada di log 9Router/dashboard, Hermes sengaja merangkumnya.
+>
+> DeepSeek **resmi** (API berbayar dari platform.deepseek.com): connect provider **DeepSeek** di dashboard 9Router dulu, lalu cek nama model persisnya lewat dashboard (atau endpoint `/v1/models`) sebelum diisi ke `HERMES_MODEL`.
+>
+> Tes cepat dari terminal VPS (lihat model DeepSeek yang benar-benar tersedia):
+> ```bash
+> source ~/.hermes/.env
+> curl -s http://nine-router.railway.internal:20128/v1/models \
+>   -H "Authorization: Bearer $OPENAI_API_KEY" | tr ',' '\n' | grep -i deepseek
+> ```
 
 > ⚠️ Jangan hapus service `nine-router` di Railway. Kalau dashboard belum login atau tidak ada provider aktif, bot Telegram akan diam — login dulu lewat URL publik 9Router dari PC kamu.
 
