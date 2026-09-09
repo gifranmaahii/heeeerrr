@@ -66,7 +66,6 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `HERMES_NINEROUTER_API_KEY` | `9r_xxxxxxxx` | ✅ (mode 9Router) | API key dari dashboard 9Router (lihat bawah) |
 | `HERMES_MODEL` | `kr/claude-sonnet-4.5` (otomatis) | opsional | Kosong = script pilih otomatis via `/v1/models` dari urutan `kr/claude-sonnet-4.5` → `kr/deepseek-3.2` (yang pertama tersedia). Isi eksplisit mis. `kr/deepseek-3.2` untuk memaksa DeepSeek — typo juga otomatis dikoreksi ke model yang tersedia |
 | `OPENROUTER_API_KEY` | `sk-or-v1-...` | ❌ | Hanya untuk mode `openrouter` |
-| `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram tambahan, **pisahkan dengan koma**. ID `7597390816` sudah otomatis di-whitelist oleh `hermes_setup.sh` (digabung, bukan menimpa — ID lama jangan dihapus). Kosong = semua orang bisa chat bot |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |
 
 **Di service `nine-router`:** buka service → tab **Variables** → tambahkan:
@@ -81,7 +80,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 
 > **Cara dapat ID Telegram:** chat ke **[@userinfobot](https://t.me/userinfobot)** → lihat angka `Id`.
 >
-> **Multi-user:** semua ID yang di-whitelist bisa chat **bot Hermes yang sama** secara bersamaan (masing-masing punya chat-nya sendiri). ID `7597390816` sudah otomatis di-whitelist oleh script; untuk menambah ID lain cukup isi `HERMES_ALLOWED_USERS` dipisah koma — **jangan hapus ID yang sudah ada**, script menggabungkannya otomatis.
+> **Multi-user:** bot Hermes terbuka untuk **semua** pengguna (`allow_all_users: true`) — siapa pun yang chat ke bot akan dibalas, masing-masing punya chat sendiri. Tidak perlu whitelist ID lagi; variabel `HERMES_ALLOWED_USERS` sudah tidak dipakai.
 
 Setelah menambah variabel → tab **Deployments** → klik **Redeploy** agar variabel baru dipakai.
 
@@ -260,7 +259,7 @@ TELEGRAM_BOT_TOKEN=xxx HERMES_NINEROUTER_API_KEY=9r_xxx docker compose up --buil
 ## 🔐 Keamanan
 
 - `VPS_URL` dan `VPS_PASSWORD` hanya untuk kamu — jangan share.
-- Set `HERMES_ALLOWED_USERS` supaya cuma ID Telegram tertentu yang bisa pakai bot.
+- Bot saat ini terbuka untuk semua pengguna (`allow_all_users: true`). Kalau mau dibatasi ke ID Telegram tertentu saja, minta asisten mengaktifkan kembali mode whitelist `allowed_users` di `hermes_setup.sh`.
 - Jangan commit token bot / API key ke GitHub. Untuk mode 9Router, jangan share `HERMES_NINEROUTER_API_KEY` atau `INITIAL_PASSWORD` dashboard-nya.
 - Ganti password 9Router setelah login pertama dari dashboard.
 

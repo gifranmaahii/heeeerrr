@@ -28,7 +28,7 @@ services:
       # Opsional (salah/typo? otomatis fallback ke model yang tersedia — lihat hermes_setup.sh):
       # - HERMES_MODEL=kr/deepseek-3.2
       # - TELEGRAM_BOT_TOKEN=123456:ABC...
-      # - HERMES_ALLOWED_USERS=123456789,987654321   # pisahkan dengan koma; 7597390816 otomatis ikut (lihat hermes_setup.sh)
+      # (Whitelist Telegram sudah dihapus: bot membalas SEMUA pengguna — allow_all_users: true)
       # Mode OpenRouter (alternatif):
       # - HERMES_LLM_MODE=openrouter
       # - OPENROUTER_API_KEY=sk-or-v1-...

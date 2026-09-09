@@ -32,7 +32,8 @@
 #
 # ---- Shared ----
 #   TELEGRAM_BOT_TOKEN            — bot token from @BotFather (always required)
-#   HERMES_ALLOWED_USERS          — comma-separated Telegram user ids (optional)
+#   (Akses Telegram TERBUKA untuk semua pengguna — allow_all_users: true.
+#    Variabel HERMES_ALLOWED_USERS sudah tidak dipakai lagi.)
 # =============================================================================
 set -e
 
@@ -148,24 +149,12 @@ hermes --version || true
 echo "[2/3] Writing ~/.hermes/config.yaml ..."
 mkdir -p ~/.hermes
 
-ALLOWED="${HERMES_ALLOWED_USERS:-}"
-
-# ---- Whitelist ID Telegram permanen -------------------------------------------
-# ID di bawah ini SELALU boleh chat bot Hermes. Ia di-GABUNGKAN (bukan
-# menimpa) dengan HERMES_ALLOWED_USERS dari Railway -> Variables, jadi ID
-# Telegram lama tidak pernah hilang. Duplikat & spasi otomatis dibuang.
-FORCED_ALLOWED_USERS="7597390816"
-
-if [ -n "$ALLOWED" ]; then
-    ALLOWED=$(printf '%s\n%s\n' "$ALLOWED" "$FORCED_ALLOWED_USERS" \
-        | tr ',' '\n' \
-        | sed 's/[[:space:]]//g' \
-        | awk 'NF && !seen[$0]++' \
-        | paste -sd ',' -)
-    echo "[i] Telegram whitelist : ${ALLOWED}"
-fi
-# (Jika HERMES_ALLOWED_USERS kosong, config memakai allow_all_users: true,
-#  artinya semua orang — termasuk ID di atas — bisa chat bot.)
+# ---- Akses Telegram: TERBUKA untuk semua pengguna ----------------------------
+# (Whitelist dihapus sesuai keputusan user: bot membalas SEMUA orang yang chat,
+#  termasuk akun kedua. Config selalu menulis allow_all_users: true — tidak ada
+#  lagi ID/variabel yang perlu dijaga. Kalau suatu saat mau dibatasi lagi,
+#  aktifkan kembali mode allowed_users di blok config gateway di bawah.)
+echo "[i] Telegram access    : terbuka untuk semua user (allow_all_users: true)"
 
 if [ "$LLM_MODE" = "nine_router" ]; then
     # 9Router as the brain (OpenAI-compatible custom endpoint)
@@ -203,21 +192,7 @@ OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
 ENV
 fi
 
-if [ -n "$ALLOWED" ]; then
-    cat >> ~/.hermes/config.yaml <<YAML
-
-gateway:
-  platforms:
-    telegram:
-      bot_token: ${TELEGRAM_BOT_TOKEN}
-      allowed_users:
-YAML
-    # YAML list entries
-    echo "${ALLOWED}" | tr ',' '\n' | while read -r uid; do
-        [ -n "$uid" ] && echo "        - ${uid}"
-    done >> ~/.hermes/config.yaml
-else
-    cat >> ~/.hermes/config.yaml <<YAML
+cat >> ~/.hermes/config.yaml <<YAML
 
 gateway:
   platforms:
@@ -225,7 +200,6 @@ gateway:
       bot_token: ${TELEGRAM_BOT_TOKEN}
       allow_all_users: true
 YAML
-fi
 
 echo "Config written:"
 sed -E 's/(api_key|bot_token): .*/\1: [REDACTED]/' ~/.hermes/config.yaml
