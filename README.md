@@ -64,7 +64,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `HERMES_LLM_MODE` | `nine_router` | ❌ (default) | Otak LLM: `nine_router` (gratis) atau `openrouter` |
 | `HERMES_NINEROUTER_BASE_URL` | `http://nine-router.railway.internal:20128/v1` | ❌ (default) | Alamat 9Router lewat private networking Railway |
 | `HERMES_NINEROUTER_API_KEY` | `9r_xxxxxxxx` | ✅ (mode 9Router) | API key dari dashboard 9Router (lihat bawah) |
-| `HERMES_MODEL` | `kr/claude-sonnet-4.5` | opsional | Model 9Router yang dipakai Hermes. Contoh DeepSeek gratis: `kr/deepseek-3.2` (via Kiro) |
+| `HERMES_MODEL` | `kr/deepseek-3.2` | opsional | Model 9Router yang dipakai Hermes. Kalau model tidak tersedia/typo, script **otomatis fallback** ke model berikutnya (`kr/deepseek-3.2` → `kr/claude-sonnet-4.5`) dengan mengecek `/v1/models` saat boot |
 | `OPENROUTER_API_KEY` | `sk-or-v1-...` | ❌ | Hanya untuk mode `openrouter` |
 | `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram tambahan, **pisahkan dengan koma**. ID `7597390816` sudah otomatis di-whitelist oleh `hermes_setup.sh` (digabung, bukan menimpa — ID lama jangan dihapus). Kosong = semua orang bisa chat bot |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |

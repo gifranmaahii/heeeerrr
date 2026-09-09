@@ -25,8 +25,8 @@ services:
       - HERMES_NINEROUTER_BASE_URL=http://9router:20128/v1   # Docker Compose hostname (different from Railway!)
       # WAJIB diisi setelah kamu ambil API key dari dashboard 9Router:
       # - HERMES_NINEROUTER_API_KEY=9r_xxxxxxxxxxxxxxxx
-      # Opsional:
-      # - HERMES_MODEL=kr/claude-sonnet-4.5
+      # Opsional (salah/typo? otomatis fallback ke model yang tersedia — lihat hermes_setup.sh):
+      # - HERMES_MODEL=kr/deepseek-3.2
       # - TELEGRAM_BOT_TOKEN=123456:ABC...
       # - HERMES_ALLOWED_USERS=123456789,987654321   # pisahkan dengan koma; 7597390816 otomatis ikut (lihat hermes_setup.sh)
       # Mode OpenRouter (alternatif):
