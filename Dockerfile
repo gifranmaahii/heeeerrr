@@ -1,5 +1,15 @@
-# Hermes + Free Cloud VPS (Ubuntu 22.04 XFCE4 desktop + noVNC) for Railway
-# Based on Lyvelia/free-vps-railway, extended with an optional Hermes Agent setup.
+# ===========================================================================
+# Hermes (Nous Research) + Free Cloud VPS (Ubuntu XFCE4 + noVNC) + 9Router
+# Target deploy: Railway (free trial) — Hermes talks to 9Router over the
+# Railway private network, and you manage the 9Router dashboard from the
+# noVNC desktop inside this same container.
+#
+# Context:
+#   - Hermes  : AI agent by Nous Research (Telegram gateway runs in the VPS)
+#   - 9Router : runs as a SEPARATE compose service (service name "9router"),
+#               reachable from here at http://9router:20128  (private network)
+#               and from the desktop browser at http://localhost:20128
+# ===========================================================================
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -12,7 +22,7 @@ ENV VNC_PORT=5900
 ENV PORT=6080
 
 # ---------------------------------------------------------------------------
-# 1. Base packages + XFCE4 desktop (same as the original free-vps-railway repo)
+# 1. Base packages + XFCE4 desktop (same as Lyvelia/free-vps-railway).
 #    'curl' is required for the Hermes one-line installer (used later by
 #    hermes_setup.sh). Everything else is already needed for the desktop.
 # ---------------------------------------------------------------------------
@@ -50,8 +60,9 @@ RUN git clone https://github.com/novnc/noVNC.git /opt/novnc \
     && cp /opt/novnc/vnc.html /opt/novnc/index.html
 
 # ---------------------------------------------------------------------------
-# 3. Copy the VPS startup script and the optional Hermes autostart script.
-#    hermes_setup.sh is a no-op unless the HERMES_AUTOSTART env var is 'true'.
+# 3. Startup + Hermes setup scripts.
+#    - startup.sh      always runs: Xvfb + XFCE + x11vnc + noVNC
+#    - hermes_setup.sh runs ONLY when HERMES_AUTOSTART=true
 # ---------------------------------------------------------------------------
 WORKDIR /root
 
@@ -61,7 +72,8 @@ RUN chmod +x /startup.sh
 COPY hermes_setup.sh /opt/hermes_setup.sh
 RUN chmod +x /opt/hermes_setup.sh
 
-# Expose the noVNC web port
+# Expose the noVNC web port (Railway overrides $PORT at runtime)
 EXPOSE 6080
 
 CMD ["/startup.sh"]
+

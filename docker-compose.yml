@@ -1,5 +1,12 @@
 version: '3.8'
 
+# ===========================================================================
+# 2 service:
+#   1. hermes-free-vps : VPS Ubuntu + XFCE4 + noVNC + Hermes Agent (bot Telegram)
+#   2. 9router         : AI router (dashboard di http://localhost:20128 saat lokal)
+# Hermes NGOMONG ke 9Router lewat jaringan internal docker:
+#   http://9router:20128/v1  (pakai ini di HERMES_NINEROUTER_BASE_URL)
+# ===========================================================================
 services:
   hermes-free-vps:
     build: .
@@ -11,9 +18,38 @@ services:
       - PORT=6080
       - RESOLUTION=1280x720x24
       - VNC_PASSWORD=
-      # Hermes (uncomment + isi untuk auto-install & nyalakan bot Telegram saat lokal)
-      # - HERMES_AUTOSTART=true
+      # --- LLM: 9Router mode (default). Ganti ke 'openrouter' + isi
+      #     OPENROUTER_API_KEY kalau mau balik pakai OpenRouter. ---
+      - HERMES_AUTOSTART=true
+      - HERMES_LLM_MODE=nine_router
+      - HERMES_NINEROUTER_BASE_URL=http://9router:20128/v1   # Docker Compose hostname (different from Railway!)
+      # WAJIB diisi setelah kamu ambil API key dari dashboard 9Router:
+      # - HERMES_NINEROUTER_API_KEY=9r_xxxxxxxxxxxxxxxx
+      # Opsional:
+      # - HERMES_MODEL=kr/claude-sonnet-4.5
       # - TELEGRAM_BOT_TOKEN=123456:ABC...
-      # - OPENROUTER_API_KEY=sk-or-v1-...
       # - HERMES_ALLOWED_USERS=
+      # Mode OpenRouter (alternatif):
+      # - HERMES_LLM_MODE=openrouter
+      # - OPENROUTER_API_KEY=sk-or-v1-...
+    depends_on:
+      - 9router
     shm_size: 1gb
+
+  9router:
+    image: decolua/9router:latest
+    container_name: nine-router
+    restart: unless-stopped
+    ports:
+      - "20128:20128"   # dashboard 9Router -> buka http://localhost:20128
+    environment:
+      - PORT=20128
+      - HOSTNAME=0.0.0.0
+      - NODE_ENV=production
+      - INITIAL_PASSWORD=123456   # ganti passwordnya SETELAH login pertama
+    volumes:
+      - nine_router_data:/app/data
+
+volumes:
+  nine_router_data:
+
