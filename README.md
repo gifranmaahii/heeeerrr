@@ -67,6 +67,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `HERMES_MODEL` | `kr/claude-sonnet-4.5` (otomatis) | opsional | Kosong = script pilih otomatis via `/v1/models` dari urutan `kr/claude-sonnet-4.5` → `kr/deepseek-3.2` (yang pertama tersedia). Isi eksplisit mis. `kr/deepseek-3.2` untuk memaksa DeepSeek — typo juga otomatis dikoreksi ke model yang tersedia |
 | `OPENROUTER_API_KEY` | `sk-or-v1-...` | ❌ | Hanya untuk mode `openrouter` |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |
+| `TELEGRAM_HOME_CHANNEL` | `978960819` | opsional | Matikan notice `No home channel is set` + jadikan chat itu tujuan hasil cron job (DM = ID user Telegram, cek `@userinfobot`). Tanpa ini bot mengirim notice itu di pesan pertama setiap kali container redeploy |
 
 **Di service `nine-router`:** buka service → tab **Variables** → tambahkan:
 

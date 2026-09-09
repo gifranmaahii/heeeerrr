@@ -198,6 +198,20 @@ OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
 ENV
 fi
 
+# ---- Home channel (opsional, anti-notice berulang) ----------------------------
+# Tanpa home channel, Hermes mengirim notice "📬 No home channel is set for
+# Telegram..." ke setiap chat pada pesan pertamanya — dan karena container
+# Railway dibuat ulang tiap redeploy (tidak ada volume untuk ~/.hermes),
+# /sethome yang pernah diketik akan hilang lagi tiap deploy, jadi notice
+# terus muncul. Solusi permanen: set variabel TELEGRAM_HOME_CHANNEL=<chat_id>
+# di Railway Variables (DM = ID user Telegram, cek @userinfobot), lalu script
+# ini menanamkannya ke ~/.hermes/.env setiap boot. Hasil cron job & pesan
+# lintas platform juga otomatis terkirim ke chat tersebut.
+if [ -n "${TELEGRAM_HOME_CHANNEL:-}" ]; then
+    echo "TELEGRAM_HOME_CHANNEL=${TELEGRAM_HOME_CHANNEL}" >> ~/.hermes/.env
+    echo "[i] Home channel     : TELEGRAM_HOME_CHANNEL=${TELEGRAM_HOME_CHANNEL} -> ~/.hermes/.env"
+fi
+
 # CATATAN: blok `gateway.platforms.telegram` TIDAK ditulis lagi ke config.yaml.
 # Hermes tidak membaca otorisasi (bot_token/allowlist) dari sana — token bot
 # diambil dari TELEGRAM_BOT_TOKEN di ~/.hermes/.env, dan akses user dikontrol
