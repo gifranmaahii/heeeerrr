@@ -16,15 +16,36 @@ Buka <https://github.com/Lyvelia/free-vps-railway> → tombol **Fork** di kanan 
 
 > Repo ini isi ulang (Hermes + VPS + Telegram). Kalau mau 100% isi asli Lyvelia, fork langsung tanpa perubahan dan ikuti cara manual di README aslinya.
 
-### 2) Deploy ke Railway (2 service dari 1 repo)
+### 2) Deploy ke Railway (2 service dalam 1 project)
+
+Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai container terpisah. Hermes memanggil 9Router lewat **jaringan internal Railway** (`nama-service.railway.internal`) — gratis & tidak perlu domain publik. Tapi untuk **login dashboard 9Router**, kamu butuh domain publik service 9Router yang dibuka dari browser PC kamu.
+
+**A. Buat Service 1 — VPS + Hermes (otomatis):**
 1. Buka **<https://railway.app>** → login pakai **GitHub**.
-2. Klik **New Project** → **Deploy from GitHub repo** → pilih hasil fork kamu.
-3. Railway otomatis baca `railway.json` & `Dockerfile` → **service utama** (VPS + Hermes) ter-deploy. Tunggu sampai status **Active/Healthy**.
-4. **Tambah service 9Router**: di canvas project → klik **+ New** → **Empty Service** → pilih service baru itu → tab **Settings**:
-   - **Source** → **Docker Image** → isi `decolua/9router:latest`
-   - **Networking → Generate Domain** → isi `20128` sebagai port → dapat URL `https://xxx.up.railway.app` (ini untuk dashboard 9Router, nanti kamu akses dari dalam VPS via browser)
-5. Kembali ke **service utama** (VPS): **Settings → Networking → Generate Domain** → dapat URL noVNC.
-6. **Settings → Region**: pilih **Singapore** untuk kedua service (biar koneksi dari Indonesia kencang & komunikasi antar service cepat via private network).
+2. **New Project** → **Deploy from GitHub repo** → pilih repo `heeeerrr` kamu.
+3. Railway baca `railway.json` + `Dockerfile` → service pertama ter-deploy (VPS desktop + Hermes). Tunggu status **Active/Healthy**.
+4. Klik judul service → rename jadi `hermes-free-vps` (biar rapi).
+5. Di service ini: **Settings → Networking → Generate Domain** (port `6080`) → dapat URL noVNC `https://xxx.up.railway.app` — buat akses desktop VPS.
+
+**B. Buat Service 2 — 9Router (manual):**
+1. Klik tombol **+ New** di canvas project → pilih **Empty Service**.
+2. Klik service baru → **Settings → Source** → pilih **Docker Image** → isi `decolua/9router:latest`.
+3. Klik judul service → rename jadi **persis** `nine-router`.
+   > ⚠️ Nama ini WAJIB. Hermes mencarinya di `http://nine-router.railway.internal:20128`. Kalau namanya beda, kamu harus isi sendiri variabel `HERMES_NINEROUTER_BASE_URL`.
+4. Di panel service 9Router:
+   - **Public Networking → Generate Domain** → isi port **`20128`** → dapat URL `https://9router-xxxx.up.railway.app`. **Catat URL ini** — dipakai login dashboard 9Router dari browser PC kamu.
+   - **Volumes → Add Volume** → mount path **`/app/data`** (disarankan) — biar data provider & API key tidak hilang saat redeploy.
+   - **Variables** → tambahkan:
+     ```
+     PORT = 20128
+     INITIAL_PASSWORD = 123456
+     REQUIRE_API_KEY = true
+     NODE_ENV = production
+     DATA_DIR = /app/data
+     ```
+     > Ganti `INITIAL_PASSWORD` dengan password kuat setelah login pertama di dashboard.
+5. Di kedua service: **Settings → Region = Singapore** biar koneksi dari Indonesia kencang & komunikasi antar service cepat.
+6. Lanjut set variabel bot di **Service 1 (`hermes-free-vps`)** — lihat bagian **4) Set variabel environment** di bawah.
 
 ### 3) Buat token Telegram bot
 1. Buka Telegram, cari **[@BotFather](https://t.me/BotFather)**.
@@ -33,7 +54,8 @@ Buka <https://github.com/Lyvelia/free-vps-railway> → tombol **Fork** di kanan 
 4. (Disarankan) Cari bot kamu lalu tekan **Start** dan kirim pesan apa pun, supaya bot bisa chat kamu duluan.
 
 ### 4) Set variabel environment
-Di Railway: buka service kamu → tab **Variables** → tambahkan:
+
+**Di service `hermes-free-vps`:** buka service → tab **Variables** → tambahkan:
 
 | Nama | Contoh | Wajib? | Fungsi |
 |---|---|---|---|
@@ -47,7 +69,17 @@ Di Railway: buka service kamu → tab **Variables** → tambahkan:
 | `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram (kosongkan = semua orang bisa chat bot) |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |
 
-Cara dapat **ID Telegram**: chat ke **[@userinfobot](https://t.me/userinfobot)** → lihat angka `Id`.
+**Di service `nine-router`:** buka service → tab **Variables** → tambahkan:
+
+| Nama | Contoh | Wajib? | Fungsi |
+|---|---|---|---|
+| `PORT` | `20128` | ✅ | Port dashboard 9Router |
+| `INITIAL_PASSWORD` | `123456` | opsional | Password login awal dashboard (default: `123456`) |
+| `NODE_ENV` | `production` | opsional | Mode produksi |
+| `DATA_DIR` | `/app/data` | opsional | Lokasi data (kalau pakai volume mount `/app/data`) |
+| `REQUIRE_API_KEY` | `true` | opsional | Wajibkan API key untuk akses `/v1/*` (disarankan untuk deploy publik) |
+
+> **Cara dapat ID Telegram:** chat ke **[@userinfobot](https://t.me/userinfobot)** → lihat angka `Id`.
 
 Setelah menambah variabel → tab **Deployments** → klik **Redeploy** agar variabel baru dipakai.
 
@@ -59,21 +91,39 @@ Setelah menambah variabel → tab **Deployments** → klik **Redeploy** agar var
 
 Bot ini default-nya pakai **[9Router](https://github.com/decolua/9router)** — router AI gratis yang menyambungkan Hermes ke **Claude / GPT / Gemini / Kimi / Qwen & 100+ model lain** lewat provider gratis & langgananmu. Hermes tidak butuh `OPENROUTER_API_KEY` sama sekali di mode ini.
 
-**Cara kerja di Railway:** 9Router jalan sebagai container kedua di dalam project yang sama. Hermes memanggilnya lewat **private networking** Railway: `http://nine-router.railway.internal:20128/v1` — tanpa biaya, tanpa terpapar ke internet. Kamu mengatur provider-nya lewat **dashboard 9Router dari browser di dalam desktop VPS**.
+**Cara kerja di Railway:** 9Router jalan sebagai **container terpisah** dalam project yang sama. Hermes memanggilnya lewat **private networking** Railway: `http://nine-router.railway.internal:20128/v1` — gratis & tidak terpapar ke internet. Untuk **login dashboard 9Router & hubungkan provider**, kamu buka **URL publik service 9Router** dari **browser PC kamu** (bukan dari dalam VPS). Untuk login pertama kali & ubah password, dashboard 9Router juga bisa dibuka dari **desktop VPS**.
 
 ### Setup 9Router (sekali saja, ± 5 menit)
 
-1. Deploy project ini di Railway & buka URL noVNC-nya (desktop Ubuntu di browser).
-2. Di desktop VPS, buka **Web Browser** → alamat `http://localhost:20128`.
-3. Login dashboard 9Router (password awal `123456` — **ganti di Settings setelah login**).
-4. **Providers → Connect** — hubungkan provider yang kamu punya (mis. akun **b.ai**), atau provider gratis tanpa kartu: **Kiro** (Claude 4.5), **iFlow** (Kimi K2, Qwen, GLM), **OpenCode Free**.
-5. **Settings → API Keys → copy** API key kamu (format `9r_...`).
-6. Di Railway → **Variables** → tambahkan `HERMES_NINEROUTER_API_KEY = 9r_...` → **Redeploy**.
-7. Cek log sampai muncul `Hermes bootstrap done` → chat bot dari Telegram. 🎉
+> Sebelum memulai: pastikan **kedua service** sudah ter-deploy & status **Active** di Railway.
 
-> Model default yang diminta Hermes dari 9Router: `kr/claude-sonnet-4.5`. Ganti lewat variabel `HERMES_MODEL` — daftar lengkap model ada di dashboard 9Router (`cc/...`, `kr/...`, `if/...`, `qw/...`, dll). Kalau satu model limit, 9Router otomatis fallback ke model berikutnya.
+1. **Buka dashboard 9Router dari PC kamu:**
+   - Buka **URL publik service 9Router** dari Railway → halaman login 9Router langsung tampil.
+   - (Alternatif dari desktop VPS: buka noVNC → Web Browser → `http://localhost:20128`).
 
-> ⚠️ Jangan menghapus container 9Router di Railway. Kalau dashboard 9Router belum kamu login / belum ada provider aktif, bot Telegram akan diam — buka dashboard-nya dari desktop VPS dulu.
+2. **Login:** masukkan password awal `123456` → **Login**.
+
+3. **Ubah password (penting):** ke **Settings → Password** → ganti `123456` dengan password kuat.
+
+4. **Hubungkan provider:** ke **Providers → Connect** → pilih salah satu:
+   - **Gratis tanpa kartu:** **Kiro AI** (Claude 4.5 + GLM-5 + MiniMax), **OpenCode Free**, **Vertex AI** ($300 free credits)
+   - **Punya akun:** **b.ai** / **iFlow** / provider lain yang sudah kamu miliki
+
+5. **Buat & salin API key:** ke **Settings → API Keys → Create** → copy API key baru (format `9r_...`).
+
+6. **Isi variabel di Railway:** kembali ke Railway → service `hermes-free-vps` → tab **Variables**:
+   ```
+   HERMES_NINEROUTER_API_KEY = 9r_xxxxxxxxxxxxxxxx
+   ```
+   Lalu klik **Deployments → Redeploy**.
+
+7. **Tunggu & tes:**
+   - Cek log service `hermes-free-vps`: cari tulisan `Hermes bootstrap done`.
+   - Buka bot Telegram kamu → klik **Start** → mulai chat. 🎉
+
+> Model default yang diminta Hermes dari 9Router: `kr/claude-sonnet-4.5`. Ganti lewat variabel `HERMES_MODEL`. Daftar model ada di dashboard 9Router: `cc/...`, `kr/...`, `if/...`, `qw/...`, `glm/...` dll. Kalau satu model limit, 9Router otomatis fallback ke model berikutnya.
+
+> ⚠️ Jangan hapus service `nine-router` di Railway. Kalau dashboard belum login atau tidak ada provider aktif, bot Telegram akan diam — login dulu lewat URL publik 9Router dari PC kamu.
 
 ---
 
@@ -101,10 +151,11 @@ Lalu **Redeploy**. Tidak perlu variabel 9Router di mode ini.
 - Hermes punya **memori permanen** dan bisa **membuat skill sendiri** — makin sering dipakai makin pintar.
 
 > Kalau bot tidak membalas:
-> 1. Cek log Railway (`Deployments → View Logs`) — cari `Hermes bootstrap done` (sukses) atau pesan `[!]`.
-> 2. Kalau muncul `HERMES_NINEROUTER_API_KEY is not set`, ikuti langkah **Setup 9Router** di atas dulu.
-> 3. Pastikan dashboard 9Router sudah login & ada provider aktif.
-> 4. Pastikan tombol **Start** sudah ditekan di bot Telegram.
+> 1. Cek log Railway (`Deployments → View Logs` pada service `hermes-free-vps`) — cari `Hermes bootstrap done` (sukses) atau pesan `[!]`.
+> 2. Kalau muncul `HERMES_NINEROUTER_API_KEY is not set`, ikuti langkah **Setup 9Router** di atas dulu (login dashboard dari URL publik 9Router, connect provider, buat API key, isi variabel).
+> 3. Pastikan service `nine-router` sudah **Active** di Railway.
+> 4. Pastikan dashboard 9Router sudah login & ada provider aktif (buka URL publik 9Router dari PC kamu).
+> 5. Pastikan tombol **Start** sudah ditekan di bot Telegram.
 
 ---
 
