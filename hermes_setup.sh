@@ -99,6 +99,23 @@ mkdir -p ~/.hermes
 
 ALLOWED="${HERMES_ALLOWED_USERS:-}"
 
+# ---- Whitelist ID Telegram permanen -------------------------------------------
+# ID di bawah ini SELALU boleh chat bot Hermes. Ia di-GABUNGKAN (bukan
+# menimpa) dengan HERMES_ALLOWED_USERS dari Railway -> Variables, jadi ID
+# Telegram lama tidak pernah hilang. Duplikat & spasi otomatis dibuang.
+FORCED_ALLOWED_USERS="7597390816"
+
+if [ -n "$ALLOWED" ]; then
+    ALLOWED=$(printf '%s\n%s\n' "$ALLOWED" "$FORCED_ALLOWED_USERS" \
+        | tr ',' '\n' \
+        | sed 's/[[:space:]]//g' \
+        | awk 'NF && !seen[$0]++' \
+        | paste -sd ',' -)
+    echo "[i] Telegram whitelist : ${ALLOWED}"
+fi
+# (Jika HERMES_ALLOWED_USERS kosong, config memakai allow_all_users: true,
+#  artinya semua orang — termasuk ID di atas — bisa chat bot.)
+
 if [ "$LLM_MODE" = "nine_router" ]; then
     # 9Router as the brain (OpenAI-compatible custom endpoint)
     MODEL="${HERMES_MODEL:-kr/claude-sonnet-4.5}"

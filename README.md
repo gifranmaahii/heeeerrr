@@ -66,7 +66,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `HERMES_NINEROUTER_API_KEY` | `9r_xxxxxxxx` | ✅ (mode 9Router) | API key dari dashboard 9Router (lihat bawah) |
 | `HERMES_MODEL` | `kr/claude-sonnet-4.5` | opsional | Model 9Router yang dipakai Hermes |
 | `OPENROUTER_API_KEY` | `sk-or-v1-...` | ❌ | Hanya untuk mode `openrouter` |
-| `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram (kosongkan = semua orang bisa chat bot) |
+| `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram tambahan, **pisahkan dengan koma**. ID `7597390816` sudah otomatis di-whitelist oleh `hermes_setup.sh` (digabung, bukan menimpa — ID lama jangan dihapus). Kosong = semua orang bisa chat bot |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |
 
 **Di service `nine-router`:** buka service → tab **Variables** → tambahkan:
@@ -80,6 +80,8 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `REQUIRE_API_KEY` | `true` | opsional | Wajibkan API key untuk akses `/v1/*` (disarankan untuk deploy publik) |
 
 > **Cara dapat ID Telegram:** chat ke **[@userinfobot](https://t.me/userinfobot)** → lihat angka `Id`.
+>
+> **Multi-user:** semua ID yang di-whitelist bisa chat **bot Hermes yang sama** secara bersamaan (masing-masing punya chat-nya sendiri). ID `7597390816` sudah otomatis di-whitelist oleh script; untuk menambah ID lain cukup isi `HERMES_ALLOWED_USERS` dipisah koma — **jangan hapus ID yang sudah ada**, script menggabungkannya otomatis.
 
 Setelah menambah variabel → tab **Deployments** → klik **Redeploy** agar variabel baru dipakai.
 
