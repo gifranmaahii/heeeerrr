@@ -64,7 +64,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 | `HERMES_LLM_MODE` | `nine_router` | ❌ (default) | Otak LLM: `nine_router` (gratis) atau `openrouter` |
 | `HERMES_NINEROUTER_BASE_URL` | `http://nine-router.railway.internal:20128/v1` | ❌ (default) | Alamat 9Router lewat private networking Railway |
 | `HERMES_NINEROUTER_API_KEY` | `9r_xxxxxxxx` | ✅ (mode 9Router) | API key dari dashboard 9Router (lihat bawah) |
-| `HERMES_MODEL` | `kr/deepseek-3.2` | opsional | Model 9Router yang dipakai Hermes. Kalau model tidak tersedia/typo, script **otomatis fallback** ke model berikutnya (`kr/deepseek-3.2` → `kr/claude-sonnet-4.5`) dengan mengecek `/v1/models` saat boot |
+| `HERMES_MODEL` | `kr/deepseek-3.2` | opsional | Model 9Router yang dipakai Hermes. Saat boot script **memvalidasi ke `/v1/models`**: preferensi `kr/deepseek-3.2` → `kr/claude-sonnet-4.5`, yang pertama tersedia dipakai (typo juga otomatis dikoreksi). Kalau 9Router tidak terjangkau saat boot, dipakai `kr/claude-sonnet-4.5` |
 | `OPENROUTER_API_KEY` | `sk-or-v1-...` | ❌ | Hanya untuk mode `openrouter` |
 | `HERMES_ALLOWED_USERS` | `123456789,987654321` | opsional | Whitelist ID Telegram tambahan, **pisahkan dengan koma**. ID `7597390816` sudah otomatis di-whitelist oleh `hermes_setup.sh` (digabung, bukan menimpa — ID lama jangan dihapus). Kosong = semua orang bisa chat bot |
 | `VNC_PASSWORD` | `rahasia123` | opsional | Password akses desktop VPS |
@@ -123,7 +123,9 @@ Bot ini default-nya pakai **[9Router](https://github.com/decolua/9router)** — 
    - Cek log service `hermes-free-vps`: cari tulisan `Hermes bootstrap done`.
    - Buka bot Telegram kamu → klik **Start** → mulai chat. 🎉
 
-> Model default yang diminta Hermes dari 9Router: `kr/claude-sonnet-4.5`. Ganti lewat variabel `HERMES_MODEL`. Daftar model ada di dashboard 9Router: `cc/...`, `kr/...`, `if/...`, `qw/...`, `glm/...` dll. Kalau satu model limit, 9Router otomatis fallback ke model berikutnya.
+> Preferensi model saat boot (otomatis, via `/v1/models`): `kr/deepseek-3.2` → `kr/claude-sonnet-4.5` — yang pertama tersedia dipakai. Ganti lewat variabel `HERMES_MODEL`. Daftar model ada di dashboard 9Router: `cc/...`, `kr/...`, `if/...`, `qw/...`, `glm/...` dll. Kalau satu model limit, 9Router otomatis fallback ke model berikutnya.
+>
+> Bot **bengong/diam**? Gateway Telegram sekarang dijalankan dengan **watchdog** (auto-restart kalau crash), dan 30 detik setelah start potongan log gateway di-`tail` ke **log deploy Railway** (Deployments → View Logs) — jadi penyebab bot diam bisa langsung dibaca dari situ tanpa buka noVNC.
 
 ### 🐬 Pakai DeepSeek (gratis via Kiro)
 
