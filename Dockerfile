@@ -49,6 +49,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     xterm \
     zip \
     unzip \
+    xz-utils \
+    bzip2 \
+    build-essential \
+    libffi-dev \
+    libssl-dev \
+    python3-dev \
+    ripgrep \
+    ffmpeg \
+    jq \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -58,6 +67,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc \
     && git clone https://github.com/novnc/websockify /opt/novnc/utils/websockify \
     && cp /opt/novnc/vnc.html /opt/novnc/index.html
+
+# ---------------------------------------------------------------------------
+# 2b. Hermes Agent (DI-BAKE ke image) -> boot cepat & bot tidak bisa mati
+#     karena apt/curl gagal saat restart container. hermes_setup.sh hanya
+#     memverifikasi binary-nya saat start.
+# ---------------------------------------------------------------------------
+RUN bash -c 'set -o pipefail; \
+      curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash' \
+ || bash -c 'set -o pipefail; \
+      curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash' \
+ || { echo "[FATAL] Gagal install Hermes Agent saat build image"; exit 1; }
+
+ENV PATH="/root/.local/bin:${PATH}"
+RUN bash -c 'hermes --version || true; command -v hermes >/dev/null 2>&1 || { echo "[FATAL] binary hermes tidak ditemukan setelah install"; exit 1; }'
 
 # ---------------------------------------------------------------------------
 # 3. Startup + Hermes setup scripts.

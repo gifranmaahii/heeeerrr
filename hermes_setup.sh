@@ -13,11 +13,14 @@
 #   HERMES_LLM_MODE=nine_router   (or unset — this is the default)
 #   HERMES_NINEROUTER_BASE_URL    — http://nine-router.railway.internal:20128/v1 (default for Railway)
 #   HERMES_NINEROUTER_API_KEY     — your 9Router API key (from dashboard)
-#   HERMES_MODEL                  — model in 9Router (preference: kr/deepseek-3.2,
-#                                   fallback otomatis kr/claude-sonnet-4.5; script
-#                                   memvalidasi ke /v1/models saat boot. Kalau
-#                                   9Router tidak terjangkau saat boot, dipakai
-#                                   kr/claude-sonnet-4.5 yang sudah dikenal baik)
+#   HERMES_MODEL                  — model in 9Router. Kosong = otomatis: script
+#                                   validasi ke /v1/models dan memakai model
+#                                   pertama yang tersedia dari urutan
+#                                   kr/claude-sonnet-4.5 -> kr/deepseek-3.2.
+#                                   Isi eksplisit (mis. kr/deepseek-3.2) untuk
+#                                   memaksa model itu (tetap divalidasi; kalau
+#                                   9Router tidak terjangkau saat boot, isi
+#                                   variabel ini dipakai apa adanya).
 #   NO OPENROUTER_API_KEY NEEDED — 9Router is the brain, you connect providers
 #      (b.ai, Kiro, iFlow, Qwen...) from its dashboard (http://localhost:20128
 #      inside the VPS desktop browser).
@@ -75,11 +78,13 @@ fi
 # Pilih model pertama yang BENAR-BENAR tersedia di 9Router (dicek via /v1/models
 # saat boot). Urutan preferensi:
 #   1) HERMES_MODEL  — kalau diisi dan tersedia
-#   2) kr/deepseek-3.2       — DeepSeek gratis via Kiro
-#   3) kr/claude-sonnet-4.5  — default lama via Kiro
+#   2) kr/claude-sonnet-4.5  — dikenal baik di deployment ini (prioritas utama,
+#                              supaya bot tidak menggantung saat Kiro limit)
+#   3) kr/deepseek-3.2       — DeepSeek gratis via Kiro (kalau Claude tidak ada,
+#                              atau kalau HERMES_MODEL diisi eksplisit)
 # Kalau 9Router belum bisa dihubungi saat boot, validasi dilewati (tidak fatal).
 MODEL=""
-MODEL_PREFERENCE="kr/deepseek-3.2 kr/claude-sonnet-4.5"
+MODEL_PREFERENCE="kr/claude-sonnet-4.5 kr/deepseek-3.2"
 
 if [ "$LLM_MODE" = "nine_router" ] && command -v curl >/dev/null 2>&1; then
     MODELS_JSON=""
@@ -123,34 +128,24 @@ fi
 [ -n "$MODEL" ] || MODEL="${HERMES_MODEL:-kr/claude-sonnet-4.5}"
 echo "[i] Model final untuk config: ${MODEL}"
 
-# ---- 1. System dependencies -------------------------------------------------
-echo "[1/5] Installing system dependencies..."
-apt-get update -y
-apt-get install -y --no-install-recommends \
-    curl \
-    xz-utils \
-    bzip2 \
-    build-essential \
-    libffi-dev \
-    libssl-dev \
-    python3-dev \
-    ripgrep \
-    ffmpeg \
-    jq
-
-# ---- 2. Install Hermes Agent (official installer) ----------------------------
-echo "[2/5] Installing Hermes Agent..."
+# ---- 1. Verifikasi Hermes Agent ----------------------------------------------
+# Semua system deps + Hermes Agent sekarang DI-BAKE di Dockerfile (dibangun saat
+# deploy), jadi boot cepat dan bot tidak bisa mati karena apt/curl gagal saat
+# restart container. Di sini cukup verifikasi binary-nya ada.
+echo "[1/3] Verifying Hermes Agent installation..."
 export HOME=/root
-# Installer writes the 'hermes' launcher to ~/.local/bin and the repo to ~/.hermes/
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash || \
-curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
 export PATH="$HOME/.local/bin:$PATH"
-
-echo "[3/5] Verifying install..."
+if ! command -v hermes >/dev/null 2>&1; then
+    echo "[FATAL] 'hermes' tidak ditemukan di PATH."
+    echo "        Kemungkinan image masih versi lama (Hermes belum dibake)."
+    echo "        Fix: Railway -> Deployments -> Redeploy (build penuh),"
+    echo "        bukan sekadar restart."
+    exit 1
+fi
 hermes --version || true
 
 # ---- 3. Write config ---------------------------------------------------------
-echo "[4/5] Writing ~/.hermes/config.yaml ..."
+echo "[2/3] Writing ~/.hermes/config.yaml ..."
 mkdir -p ~/.hermes
 
 ALLOWED="${HERMES_ALLOWED_USERS:-}"
@@ -236,7 +231,7 @@ echo "Config written:"
 sed -E 's/(api_key|bot_token): .*/\1: [REDACTED]/' ~/.hermes/config.yaml
 
 # ---- 4. Start Telegram gateway ----------------------------------------------
-echo "[5/5] Starting Hermes gateway..."
+echo "[3/3] Starting Hermes gateway..."
 # First run may do first-time init; keep it alive in the background.
 # WATCHDOG: kalau proses gateway mati/crash, restart otomatis 5 detik kemudian
 # supaya bot tidak "bengong" selamanya. Semua output masuk hermes_gateway.log.
