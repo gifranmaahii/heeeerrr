@@ -80,7 +80,7 @@ Kenapa **2 service**? Hermes (bot Telegram) dan 9Router (otak AI) jalan sebagai 
 
 > **Cara dapat ID Telegram:** chat ke **[@userinfobot](https://t.me/userinfobot)** → lihat angka `Id`.
 >
-> **Multi-user:** bot Hermes terbuka untuk **semua** pengguna (`allow_all_users: true`) — siapa pun yang chat ke bot akan dibalas, masing-masing punya chat sendiri. Tidak perlu whitelist ID lagi; variabel `HERMES_ALLOWED_USERS` sudah tidak dipakai.
+> **Multi-user:** bot Hermes terbuka untuk **semua** pengguna — script menulis `TELEGRAM_ALLOW_ALL_USERS=true` ke `~/.hermes/.env` (flag otorisasi resmi Hermes; gateway membacanya dari `.env`, bukan `config.yaml`). Siapa pun yang chat ke bot akan dibalas, masing-masing punya chat sendiri. Tidak perlu whitelist ID lagi; variabel `HERMES_ALLOWED_USERS` sudah tidak dipakai.
 
 Setelah menambah variabel → tab **Deployments** → klik **Redeploy** agar variabel baru dipakai.
 
@@ -259,7 +259,7 @@ TELEGRAM_BOT_TOKEN=xxx HERMES_NINEROUTER_API_KEY=9r_xxx docker compose up --buil
 ## 🔐 Keamanan
 
 - `VPS_URL` dan `VPS_PASSWORD` hanya untuk kamu — jangan share.
-- Bot saat ini terbuka untuk semua pengguna (`allow_all_users: true`). Kalau mau dibatasi ke ID Telegram tertentu saja, minta asisten mengaktifkan kembali mode whitelist `allowed_users` di `hermes_setup.sh`.
+- Bot saat ini terbuka untuk semua pengguna (`TELEGRAM_ALLOW_ALL_USERS=true` di `~/.hermes/.env`). Kalau mau dibatasi ke ID Telegram tertentu saja, ganti flag itu menjadi `TELEGRAM_ALLOWED_USERS=<id1>,<id2>` di blok penulisan `.env` pada `hermes_setup.sh`.
 - Jangan commit token bot / API key ke GitHub. Untuk mode 9Router, jangan share `HERMES_NINEROUTER_API_KEY` atau `INITIAL_PASSWORD` dashboard-nya.
 - Ganti password 9Router setelah login pertama dari dashboard.
 

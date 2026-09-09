@@ -32,7 +32,9 @@
 #
 # ---- Shared ----
 #   TELEGRAM_BOT_TOKEN            — bot token from @BotFather (always required)
-#   (Akses Telegram TERBUKA untuk semua pengguna — allow_all_users: true.
+#   (Akses Telegram TERBUKA untuk semua pengguna: script menulis
+#    TELEGRAM_ALLOW_ALL_USERS=true ke ~/.hermes/.env — flag resmi Hermes.
+#    Otorisasi gateway Hermes dibaca dari .env, BUKAN dari config.yaml.
 #    Variabel HERMES_ALLOWED_USERS sudah tidak dipakai lagi.)
 # =============================================================================
 set -e
@@ -151,10 +153,12 @@ mkdir -p ~/.hermes
 
 # ---- Akses Telegram: TERBUKA untuk semua pengguna ----------------------------
 # (Whitelist dihapus sesuai keputusan user: bot membalas SEMUA orang yang chat,
-#  termasuk akun kedua. Config selalu menulis allow_all_users: true — tidak ada
-#  lagi ID/variabel yang perlu dijaga. Kalau suatu saat mau dibatasi lagi,
-#  aktifkan kembali mode allowed_users di blok config gateway di bawah.)
-echo "[i] Telegram access    : terbuka untuk semua user (allow_all_users: true)"
+#  termasuk akun kedua. Hermes membaca otorisasi user dari ~/.hermes/.env —
+#  BUKAN dari config.yaml (key YAML seperti allow_all_users TIDAK dibaca).
+#  Flag resminya: TELEGRAM_ALLOW_ALL_USERS=true; tanpa flag ini gateway
+#  default-DENY semua user. Kalau suatu saat mau dibatasi lagi, tulis
+#  TELEGRAM_ALLOWED_USERS=<id1>,<id2> ke ~/.hermes/.env sebagai gantinya.)
+echo "[i] Telegram access    : terbuka untuk semua user (TELEGRAM_ALLOW_ALL_USERS=true)"
 
 if [ "$LLM_MODE" = "nine_router" ]; then
     # 9Router as the brain (OpenAI-compatible custom endpoint)
@@ -170,6 +174,7 @@ YAML
 
     cat > ~/.hermes/.env <<ENV
 TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+TELEGRAM_ALLOW_ALL_USERS=true
 OPENAI_API_KEY=${NINEROUTER_API_KEY}
 OPENAI_BASE_URL=${NINEROUTER_BASE_URL}
 ENV
@@ -188,18 +193,15 @@ YAML
 
     cat > ~/.hermes/.env <<ENV
 TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+TELEGRAM_ALLOW_ALL_USERS=true
 OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
 ENV
 fi
 
-cat >> ~/.hermes/config.yaml <<YAML
-
-gateway:
-  platforms:
-    telegram:
-      bot_token: ${TELEGRAM_BOT_TOKEN}
-      allow_all_users: true
-YAML
+# CATATAN: blok `gateway.platforms.telegram` TIDAK ditulis lagi ke config.yaml.
+# Hermes tidak membaca otorisasi (bot_token/allowlist) dari sana — token bot
+# diambil dari TELEGRAM_BOT_TOKEN di ~/.hermes/.env, dan akses user dikontrol
+# flag TELEGRAM_ALLOW_ALL_USERS=true di .env (lihat heredoc di atas).
 
 echo "Config written:"
 sed -E 's/(api_key|bot_token): .*/\1: [REDACTED]/' ~/.hermes/config.yaml
