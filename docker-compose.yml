@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  hermes-free-vps:
+    build: .
+    container_name: hermes-free-vps
+    restart: unless-stopped
+    ports:
+      - "6080:6080"
+    environment:
+      - PORT=6080
+      - RESOLUTION=1280x720x24
+      - VNC_PASSWORD=
+      # Hermes (uncomment + isi untuk auto-install & nyalakan bot Telegram saat lokal)
+      # - HERMES_AUTOSTART=true
+      # - TELEGRAM_BOT_TOKEN=123456:ABC...
+      # - OPENROUTER_API_KEY=sk-or-v1-...
+      # - HERMES_ALLOWED_USERS=
+    shm_size: 1gb

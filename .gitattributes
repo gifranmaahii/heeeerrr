@@ -1,0 +1,8 @@
+# Normalize line endings — shell scripts MUST be LF for the Ubuntu container
+*.sh text eol=lf
+Dockerfile text eol=lf
+railway.json text eol=lf
+docker-compose.yml text eol=lf
+.github/workflows/*.yml text eol=lf
+*.md text eol=lf
+.gitignore text eol=lf

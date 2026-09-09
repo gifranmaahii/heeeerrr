@@ -1,0 +1,20 @@
+name: Keep Railway VPS Alive
+
+on:
+  schedule:
+    - cron: '*/5 * * * *'
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping VPS URL
+        env:
+          VPS_URL: ${{ secrets.VPS_URL }}
+        run: |
+          if [ -z "$VPS_URL" ]; then
+            echo "::error::Secret VPS_URL belum di-set. Tambahkan di Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          curl -sS -o /dev/null -w "Ping OK: HTTP %{http_code}\n" "$VPS_URL" || echo "Ping gagal - server mungkin sedang redeploy/sleep"
