@@ -87,6 +87,28 @@ Setelah menambah variabel → tab **Deployments** → klik **Redeploy** agar var
 
 > Saat pertama kali jalan, install Hermes butuh ± 2–5 menit lagi. Cek log di **Deployments → View Logs** sampai muncul pesan `Hermes bootstrap done` atau buka chat bot kamu.
 
+> Saat pertama kali jalan, install Hermes butuh ± 2–5 menit lagi. Cek log di **Deployments → View Logs** sampai muncul pesan `Hermes bootstrap done` atau buka chat bot kamu.
+
+### 5) Pasang Railway Volume (WAJIB — biar ingatan Hermes tidak hilang!)
+
+Tanpa volume, **semua data Hermes** (memories/ingatan, skills, riwayat chat, hasil `/sethome`, persona SOUL.md, state.db) **HILANG** tiap kali container redeploy — karena filesystem container Railway itu ephemeral.
+
+**Cara pasang (sekali saja, ± 1 menit):**
+
+1. **Buka terminal lokal** (VS Code / PowerShell) yang sudah login Railway (`railway link`).
+2. Jalankan perintah ini:
+   ```bash
+   railway volume add --service heeeerrr --mount-path /root/.hermes --json
+   ```
+   > Ganti `heeeerrr` dengan nama service VPS kamu kalau beda. Mount path **harus** `/root/.hermes`.
+3. **Tunggu deploy selesai** (Railway otomatis trigger redeploy). Volume baru akan di-mount.
+4. **Cek log deploy** di Railway Dashboard → **Deployments → View Logs** → pastikan muncul `Hermes bootstrap done`.
+
+> **Yang terjadi:** Railway membuat volume persisten (1 GB) di `/root/.hermes`. Docker copy isi image (termasuk `node/` runtime Hermes, 230 MB) ke volume saat first mount. Setelah itu, semua data yang ditulis Hermes ke `~/.hermes/` **tidak akan hilang lagi** tiap redeploy. Script setup juga sudah **volume-aware**: `.env` di-upsert (bukan ditimpa), config.yaml mempertahankan bagian `/sethome`, dan SOUL.md di-seed kalau kosong.
+
+> **Sudah pernah pasang volume?** Kalau kamu sudah pasang volume sebelumnya, skip langkah ini. Cek: `railway volume list`.
+
+---
 ---
 
 ## 🧠 Otak LLM Gratis: 9Router (default)
