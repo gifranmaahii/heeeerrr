@@ -62,6 +62,85 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # ---------------------------------------------------------------------------
+# 1b. CTF / pentest toolkit (authorized targets & CTF competitions only).
+#     Installed tolerantly (|| true) so one unavailable package never breaks
+#     the image build. Heavy tools (metasploit) are installed on demand by
+#     /opt/ctf_toolkit.sh instead of baked in.
+# ---------------------------------------------------------------------------
+RUN apt-get update && ( apt-get install -y --no-install-recommends \
+        nmap \
+        netcat-openbsd \
+        socat \
+        dnsutils \
+        whois \
+        tcpdump \
+        traceroute \
+        masscan \
+        sqlmap \
+        hydra \
+        john \
+        hashcat \
+        binutils \
+        gdb \
+        strace \
+        ltrace \
+        file \
+        binwalk \
+        exiftool \
+        steghide \
+        foremost \
+        sleuthkit \
+        radare2 \
+        patchelf \
+        gcc-multilib \
+        libc6-dbg \
+        ruby-full \
+        golang-go \
+        jq \
+        p7zip-full \
+        openssl \
+        libpcap-dev \
+        zlib1g-dev \
+        pkg-config \
+        autoconf \
+        automake \
+        libtool \
+      || echo "[warn] some CTF apt packages unavailable — continuing" ) \
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
+
+# ---------------------------------------------------------------------------
+# 1c. CTF python tooling (exploit dev, crypto, web, misc)
+# ---------------------------------------------------------------------------
+RUN ( pip3 install --no-cache-dir \
+        pwntools \
+        requests \
+        pycryptodome \
+        z3-solver \
+        capstone \
+        keystone-engine \
+        unicorn \
+        ropper \
+        ROPgadget \
+        angr \
+        scapy \
+        beautifulsoup4 \
+        flask-unsign \
+        jwt-tool \
+        pyjwt \
+        paramiko \
+        impacket \
+      || echo "[warn] some pip packages failed — continuing" )
+
+# ---------------------------------------------------------------------------
+# 1d. Go-based recon tools (ffuf + gobuster) built from source
+# ---------------------------------------------------------------------------
+RUN ( export GOPATH=/root/go GOBIN=/usr/local/bin GO111MODULE=on \
+      && go install github.com/ffuf/ffuf/v2@latest \
+      && go install github.com/OJ/gobuster/v3@latest \
+      ) || echo "[warn] go tools build skipped — continue (install later via ctf_toolkit.sh)"
+
+
+# ---------------------------------------------------------------------------
 # 2. noVNC + websockify (in-browser remote desktop access)
 # ---------------------------------------------------------------------------
 RUN git clone https://github.com/novnc/noVNC.git /opt/novnc \
@@ -94,6 +173,9 @@ RUN chmod +x /startup.sh
 
 COPY hermes_setup.sh /opt/hermes_setup.sh
 RUN chmod +x /opt/hermes_setup.sh
+
+COPY ctf_toolkit.sh /opt/ctf_toolkit.sh
+RUN chmod +x /opt/ctf_toolkit.sh
 
 # Expose the noVNC web port (Railway overrides $PORT at runtime)
 EXPOSE 6080
