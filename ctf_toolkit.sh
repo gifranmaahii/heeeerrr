@@ -17,6 +17,11 @@
 #   bash /opt/ctf_toolkit.sh scope add IP/HOST
 #   bash /opt/ctf_toolkit.sh scope list
 #   bash /opt/ctf_toolkit.sh recon <target> [outdir]
+#   bash /opt/ctf_toolkit.sh wordlist <target>
+#   bash /opt/ctf_toolkit.sh privesc [linux|win]
+#   bash /opt/ctf_toolkit.sh flags [dir]
+#   bash /opt/ctf_toolkit.sh writeup <target>
+#   bash /opt/ctf_toolkit.sh multi [-j N] [-f list] <targets...>
 #   bash /opt/ctf_toolkit.sh help
 # =============================================================================
 set -uo pipefail
@@ -213,6 +218,159 @@ do_recon() {
 }
 
 # ---------------------------------------------------------------------------
+# wordlist — build a target-specific wordlist from recon output
+# ---------------------------------------------------------------------------
+do_wordlist() {
+    local target="${1:-}"
+    [ -z "$target" ] && { c_red "usage: $0 wordlist <target> [outdir]"; return 1; }
+    ensure_dirs
+    local out="${2:-$WORK_BASE/$target}"
+    local wl="$out/wordlist.txt"
+    mkdir -p "$out"
+
+    c_blue "[*] Building custom wordlist for $target ..."
+    : > "$wl"
+
+    {
+        echo "$target" | tr '.' '\n'
+        echo "$target"
+        [ -f "$out/nmap.txt" ] && {
+            grep -oE '(http|ssh|ftp|smtp|dns|mysql|postgres|redis|mongodb)[a-z0-9._-]*' "$out/nmap.txt"
+            grep -E '^[0-9]+/tcp' "$out/nmap.txt" | awk '{print $1}' | tr -d '/tcp'
+            grep -iE 'host:|server:' "$out/nmap.txt" | awk '{print $2}'
+        }
+        [ -f "$out/gobuster.txt" ] && awk -F/ '{print $1}' "$out/gobuster.txt" 2>/dev/null
+        [ -f "$out/http_headers.txt" ] && grep -iE 'server:|x-powered-by:' "$out/http_headers.txt" \
+            | tr ' /;' '\n' | grep -vE '^$|^server|^x-powered'
+    } 2>/dev/null | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9._-' \
+        | awk 'length>=3 && length<=30' | sort -u > "$wl"
+
+    if [ -s "$wl" ]; then
+        awk '{print $0; print $0"1"; print $0"123"; print $0"2025"}' "$wl" \
+            | sort -u > "$wl.mut"
+        sort -u "$wl.mut" -o "$wl"; rm -f "$wl.mut"
+    fi
+    local n; n=$(wc -l < "$wl" 2>/dev/null || echo 0)
+    c_green "[+] wordlist: $wl ($n entries)"
+}
+
+# ---------------------------------------------------------------------------
+# privesc — fetch linpeas/winpeas for post-exploitation
+# ---------------------------------------------------------------------------
+do_privesc() {
+    local os="${1:-linux}"
+    ensure_dirs
+    local dir="$WORK_BASE/privesc"; mkdir -p "$dir"
+    c_blue "[*] Preparing privesc helper ($os) in $dir"
+
+    case "$os" in
+        linux|lin|peas|linpeas)
+            if [ ! -s "$dir/linpeas.sh" ]; then
+                curl -fsSL -o "$dir/linpeas.sh" \
+                    https://github.com/peass-ng/PEASS-ng/releases/latest/download/linpeas.sh \
+                    || { c_red "[!] download linpeas gagal"; return 1; }
+                chmod +x "$dir/linpeas.sh"
+            fi
+            c_green "[+] linpeas: $dir/linpeas.sh"
+            echo "    Transfer:  ./linpeas.sh -a 2>&1 | tee /tmp/lp.txt"
+            ;;
+        win|windows|winpeas)
+            if [ ! -s "$dir/winPEASx64.exe" ]; then
+                curl -fsSL -o "$dir/winPEASx64.exe" \
+                    https://github.com/peass-ng/PEASS-ng/releases/latest/download/winPEASx64.exe \
+                    || { c_red "[!] download winPEAS gagal"; return 1; }
+            fi
+            c_green "[+] winPEAS: $dir/winPEASx64.exe"
+            ;;
+        *) c_red "usage: $0 privesc [linux|win]"; return 1 ;;
+    esac
+    echo "[i] GTFOBins: https://gtfobins.github.io/"
+}
+
+# ---------------------------------------------------------------------------
+# flags — search loot for flag{...} patterns
+# ---------------------------------------------------------------------------
+do_flags() {
+    local dir="${1:-$WORK_BASE}"
+    [ -d "$dir" ] || { c_red "usage: $0 flags [dir]"; return 1; }
+    c_blue "[*] Scanning $dir for flags ..."
+    local hits
+    hits=$(grep -RaoE '[A-Za-z0-9_]{2,20}\{[^}]{1,120}\}' "$dir" 2>/dev/null \
+        | grep -iE '(flag|htb|thm|pico|ctf|ductf|ractf|csr)' | sort -u)
+    hits="$hits"$'\n'"$(grep -RaoE '[A-Za-z0-9_]{2,20}\{[0-9a-fA-F]{16,64}\}' "$dir" 2>/dev/null | sort -u)"
+    hits=$(echo "$hits" | grep -vE '^\s*$' | sort -u)
+    if [ -n "$hits" ]; then
+        c_green "[+] Flags found:"; echo "$hits"
+        echo "$hits" > "$dir/FLAGS_FOUND.txt"
+    else
+        c_blue "[=] No flags yet in $dir — unzip loot or search deeper"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# writeup — generate markdown writeup from recon data
+# ---------------------------------------------------------------------------
+do_writeup() {
+    local target="${1:-}"
+    [ -z "$target" ] && { c_red "usage: $0 writeup <target> [outdir]"; return 1; }
+    local out="${2:-$WORK_BASE/$target}"
+    [ -d "$out" ] || { c_red "[!] run recon first: $out"; return 1; }
+    local wu="$out/WRITEUP.md"
+    c_blue "[*] Generating writeup -> $wu"
+    {
+        echo "# CTF Writeup — $target"; echo
+        echo "- Date: $(date)"
+        echo "## 1. Recon"
+        echo '```'; grep -E '^[0-9]+/tcp|^[0-9]+/udp' "$out/nmap.txt" 2>/dev/null \
+            | head -50 || true; echo '```'
+        [ -s "$out/http_headers.txt" ] && { echo "### HTTP headers"; echo '```'; head -30 "$out/http_headers.txt"; echo '```'; }
+        echo; echo "## 2. Enumeration"; echo "_(see ffuf.json / gobuster.txt)_"
+        echo; echo "## 3. Exploitation"; echo "_(fill: vuln + payload)_"
+        echo; echo "## 4. Privesc"; echo "_(linpeas/winpeas findings)_"
+        echo; echo "## 5. Flag"; echo '```'
+        [ -s "$out/FLAGS_FOUND.txt" ] && cat "$out/FLAGS_FOUND.txt" || echo "<flag>"
+        echo '```'
+    } > "$wu"
+    do_flags "$out" 2>/dev/null || true
+    c_green "[+] writeup: $wu"
+}
+
+# ---------------------------------------------------------------------------
+# multi — parallel recon over several in-scope targets
+# ---------------------------------------------------------------------------
+do_multi() {
+    ensure_dirs
+    local jobs=4 targets=()
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -j|--jobs) jobs="$2"; shift 2 ;;
+            -f|--file) while IFS= read -r l; do
+                          l="${l%%#*}"; l="$(echo "$l" | xargs)"
+                          [ -n "$l" ] && targets+=("$l")
+                       done < "$2"; shift 2 ;;
+            *) targets+=("$1"); shift ;;
+        esac
+    done
+    if [ ${#targets[@]} -eq 0 ]; then
+        while IFS= read -r l; do
+            l="${l%%#*}"; l="$(echo "$l" | xargs)"
+            [ -n "$l" ] && targets+=("$l")
+        done < <(grep -v '^#' "$SCOPE_FILE" 2>/dev/null)
+    fi
+    [ ${#targets[@]} -eq 0 ] && { c_red "[!] no targets. $0 scope add <t>"; return 1; }
+
+    c_blue "[*] Parallel recon: ${#targets[@]} targets, max-jobs=$jobs"
+    local pids=()
+    for t in "${targets[@]}"; do
+        in_scope "$t" || { c_red "  skip (out of scope): $t"; continue; }
+        bash "$0" recon "$t" & pids+=("$!")
+        while [ "$(jobs -r | wc -l)" -ge "$jobs" ]; do sleep 0.5; done
+    done
+    for p in "${pids[@]}"; do wait "$p" 2>/dev/null; done
+    c_green "[+] All recon done. Results in $WORK_BASE/<target>/"
+}
+
+# ---------------------------------------------------------------------------
 # help
 # ---------------------------------------------------------------------------
 do_help() {
@@ -225,24 +383,34 @@ ctf_toolkit.sh — CTF / pentest toolkit + workflow helper
   scope del <target>      Remove a target
   scope list              Show the scope file
   recon <target> [outdir] Run scope-checked recon (nmap + web + dirb)
+  wordlist <target>       Build a target-specific wordlist from recon output
+  privesc [linux|win]     Fetch linpeas/winPEAS for post-exploitation
+  flags [dir]             Search loot/recon output for flag{...} patterns
+  writeup <target>        Generate a markdown writeup from the work dir
+  multi [-j N] [-f list] <t...>  Parallel recon over several in-scope targets
   help                    This text
 
 Env:
   CTF_SCOPE_FILE  (default /root/.ctf/scope.txt)
   CTF_WORK_DIR    (default /root/ctf)
 
-NOTE: recon only runs against targets present in the scope file — CTF boxes,
-lab machines, or hosts you own / have written authorization to test.
+NOTE: recon/wordlist/multi only run against targets present in the scope file —
+CTF boxes, lab machines, or hosts you own / have written authorization to test.
 HELP
 }
 
 ensure_dirs
 cmd="${1:-help}"; shift || true
 case "$cmd" in
-    install) do_install "$@" ;;
-    status)  do_status  "$@" ;;
-    scope)   do_scope   "$@" ;;
-    recon)   do_recon   "$@" ;;
+    install)  do_install  "$@" ;;
+    status)   do_status   "$@" ;;
+    scope)    do_scope    "$@" ;;
+    recon)    do_recon    "$@" ;;
+    wordlist) do_wordlist "$@" ;;
+    privesc)  do_privesc  "$@" ;;
+    flags)    do_flags    "$@" ;;
+    writeup)  do_writeup  "$@" ;;
+    multi)    do_multi    "$@" ;;
     help|-h|--help) do_help ;;
     *) c_red "unknown command: $cmd"; echo; do_help; exit 1 ;;
 esac

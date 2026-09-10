@@ -127,10 +127,12 @@ SOUL
 - Prefer automation: parse tool output, chain steps, script repetitive work.
 
 ## Available tooling
-- /opt/ctf_toolkit.sh  (install / status / scope / recon)
+- /opt/ctf_toolkit.sh  (install / status / scope / recon / wordlist / privesc /
+  flags / writeup / multi)
 - nmap, sqlmap, hydra, john, hashcat, ffuf, gobuster, nikto, metasploit (on demand)
 - pwntools, angr, z3, pycryptodome, impacket, scapy  (python)
 - gdb+pwndbg, radare2, binwalk, steghide, exiftool  (rev/forensics)
+- linpeas/winPEAS via `ctf_toolkit.sh privesc`, GTFOBins for sudo/SUID abuse
 AGENTS
 
     echo "[i] SOUL.md + AGENTS.md written (CTF / authorized-pentest persona)"
