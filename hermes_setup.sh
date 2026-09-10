@@ -250,10 +250,173 @@ hermes --version || true
 echo "[2/3] Writing ~/.hermes/config.yaml (volume-aware)..."
 mkdir -p ~/.hermes
 
+# seed_skills — tulis skill CTF ke ~/.hermes/skills/ setiap boot (forced overwrite)
+# Skill = knowledge files yang dibaca Hermes untuk eksekusi CTF. Isi: workflow,
+# template exploit-dev, playbook crypto/web, dan cheatsheet — semua untuk target
+# AUTHORIZED (CTF/lab/owned).
+seed_skills() {
+    mkdir -p ~/.hermes/skills
+
+    cat > ~/.hermes/skills/ctf-workflow.md <<'SKILL1'
+# Skill: CTF Workflow (authorized targets only)
+
+End-to-end workflow untuk CTF competition / lab / owned machines.
+Scope check dulu: /opt/ctf_toolkit.sh scope add <target> sebelum scan.
+
+## Pipeline
+1. RECON       : /opt/ctf_toolkit.sh recon <ip>
+                 manual: nmap -sV -sC -p- <ip> -oN nmap.txt
+2. ENUM        : sesuai service (lihat web-playbook.md / recon-cheatsheet.md)
+3. EXPLOIT     : cari versi service -> searchsploit <service> <version>
+4. FOOTHOLD    : reverse shell -> stabilize: python3 -c 'import pty;pty.spawn("/bin/bash")'
+5. PRIVESC     : /opt/ctf_toolkit.sh privesc linux ; transfer & run linpeas
+                 cek: sudo -l, SUID, cron, capabilites (getcap -r / 2>/dev/null)
+6. FLAGS       : /opt/ctf_toolkit.sh flags <workdir>
+7. WRITEUP     : /opt/ctf_toolkit.sh writeup <target>
+
+## Quick triage by port
+- 21 ftp  -> anonymous? binary detection
+- 22 ssh  -> version, user enum, key hunting
+- 80/443  -> whatweb, ffuf, CMS identify, /robots.txt
+- 445 smb -> enum4linux -a, smbclient -L //ip/ -N
+- 1337+   -> netcat connect, banner grab, likely pwn challenge
+
+## Rules
+- Setiap target harus di scope file sebelum di-scan.
+- Simpan semua hasil di workdir target (/root/ctf/<target>/).
+- Catat setiap command untuk writeup.
+SKILL1
+
+    cat > ~/.hermes/skills/exploit-dev.md <<'SKILL2'
+# Skill: Exploit Development (pwntools) — CTF pwn challenges
+
+## Template dasar
+```python
+from pwn import *
+context.arch = 'amd64'   # atau i386
+context.log_level = 'info'
+
+p = process('./chal')                  # lokal
+# p = remote('host.ctf', 1337)         # remote
+elf = ELF('./chal')
+libc = ELF('./libc.so.6') if os.path.exists('./libc.so.6') else None
+
+p.sendline(payload)
+p.interactive()
+```
+
+## Pattern umum
+1. Buffer overflow sederhana (win function):
+   offset = cyclic_find(p cyclic (50)) -> pakai cyclic_arg di pwn cyclic 50
+   payload = b'A'*offset + p64(elf.symbols['win'])
+2. ret2libc (NX on, no win):
+   ROP: pop rdi; ret -> /bin/sh addr -> system()
+   rop = ROP(elf); rop.call(libc.symbols.system, [next(libc.search(b'/bin/sh\x00'))])
+3. Format string:
+   leak: p.sendline(b'%7$p') -> baca nilai stack
+   write: fmtstr_payload(offset, {target: value})
+4. Shellcode (NX off):
+   shellcraft.sh() -> asm()
+5. GOT overwrite / PLT: elf.got['printf'], elf.plt['system']
+
+## Tooling
+- checksec ./chal                # NX/PIE/canary/RELRO
+- ROPgadget --binary ./chal      # gadget hunting
+- one_gadget libc.so.6           # one-shot execve gadget
+- seccomp-tools dump ./chal      # syscall filter
+
+## Tips
+- PIE on? leak dulu dari format string / partial overwrite.
+- Canary? leak dari format string byte-per-byte.
+- Selalu test exploit lokal dulu sebelum remote.
+SKILL2
+    cat > ~/.hermes/skills/crypto-playbook.md <<'SKILL3'
+# Skill: Crypto Playbook — CTF crypto challenges
+
+## Identifikasi dulu
+- lihat file: apa formatnya? (raw bytes, base64, hex, RSA pub key, pem)
+- `file`, `xxd | head`, `cat` untuk cek encoding
+- panjang ciphertext, apakah block-aligned (16 byte -> AES? 64 -> sha-ish?)
+
+## Quick wins
+1. Base64/hex: `base64 -d`, `xxd -r -p`
+2. ROT/Caesar: `tr` atau brute semua shift; rot13
+3. XOR single-byte: brute 0..255, cari yang printable / berisi flag format
+4. XOR repeating key: cari panjang key via hamming distance, lalu freq analysis
+5. Vigenere: kasiski examination untuk key length
+
+## RSA klasik
+- n kecil -> factor pakai factordb / yafu
+- e kecil (e=3) dan m kecil -> small e attack (cube root)
+- n sama, e beda -> common modulus attack
+- d kecil -> Wiener attack
+- close primes (p ~= q) -> Fermat factorization
+- d leak / partial key -> Coppersmith
+- Tools: `pycryptodome`, `RsaCtfTool`, `sympy` untuk math
+
+## Modern cipher
+- AES-ECB: block swapping, pattern leak
+- AES-CBC: bit flipping, padding oracle (kalau server kasih error terpisah)
+- ECB dengan plaintext terkontrol -> byte-at-a-time decryption
+
+## Flag biasanya
+cari pattern `flag{`, `CTF{`, `HTB{` setelah decrypt.
+SKILL3
+
+    cat > ~/.hermes/skills/web-playbook.md <<'SKILL4'
+# Skill: Web Playbook — CTF web challenges (authorized targets only)
+
+## Recon
+- whatweb http://target          # tech fingerprint
+- curl -i http://target          # headers, cookies, server
+- ffuf -u http://target/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -mc 200,301,302,403
+- ffuf -u http://target/FUZZ -w subdomains-top1m.txt -H "Host: FUZZ.target" -fs <default-size>
+
+## SQLi
+- manual: `1' OR 1=1 -- -`, cek error, blind (sleep, boolean)
+- sqlmap: sqlmap -u "URL?param=x" --batch --dbs
+- kalau POST: --data="user=a&pass=b" -p user
+
+## SSTI / Template injection
+- payload detect: {{7*7}} ${7*7} <%= 7*7 %> #{7*7}
+- kalau 49 muncul -> identify engine -> payload sesuai (jinja2, twig, erb)
+
+## Auth bypass
+- JWT: none alg, weak secret (hashcat -m 16500), kid injection, key confusion
+- default creds, /admin tanpa auth, cookie tampering
+
+## File upload / LFI / RFI
+- LFI: ../../../etc/passwd, php://filter/convert.base64-encode/resource=index.php
+- upload: rename ke .php, cek filter, polyglot (GIF+PHP), content-type bypass
+
+## Common flags location
+- /flag, /flag.txt, environment vars, DB, source code comment, robots.txt
+SKILL4
+
+    cat > ~/.hermes/skills/writeup.md <<'SKILL5'
+# Skill: Writeup & Reporting
+
+## Struktur writeup
+1. Summary  : apa challenge-nya, kategori, difficulty, flag
+2. Recon    : port/service ketemu, teknologi
+3. Enum     : apa yang dicoba, yang gagal juga penting
+4. Exploit  : langkah eksploitasi lengkap, payload, script
+5. Flag     : flag + di mana ditemukan
+6. Notes    : pelajaran, referensi
+
+## Aturan
+- Simpan di workdir target: /root/ctf/<target>/WRITEUP.md
+- Auto-generate: /opt/ctf_toolkit.sh writeup <target>
+- Include real commands + output (bukan paraf), biar bisa direproduksi.
+- Kalau ada exploit script, taruh di workdir dan link dari writeup.
+SKILL5
+}
+
 # ---- Seed SOUL.md + AGENTS.md setiap boot (forced overwrite) ---------------
 seed_identity
 
-# ---- Akses Telegram: TERBUKA untuk semua pengguna ----------------------------
+# ---- Seed skill CTF setiap boot (forced overwrite) --------------------------
+seed_skills
 # (Whitelist dihapus sesuai keputusan user: bot membalas SEMUA orang yang chat,
 #  termasuk akun kedua. Hermes membaca otorisasi user dari ~/.hermes/.env —
 #  BUKAN dari config.yaml (key YAML seperti allow_all_users TIDAK dibaca).
