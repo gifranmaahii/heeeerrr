@@ -177,16 +177,28 @@ else
 fi
 
 # ---- Model validation & auto-fallback (9Router mode only) --------------------
-# Pilih model pertama yang BENAR-BENAR tersedia di 9Router (dicek via /v1/models
-# saat boot). Urutan preferensi:
-#   1) HERMES_MODEL  — kalau diisi dan tersedia
-#   2) kr/claude-sonnet-4.5  — dikenal baik di deployment ini (prioritas utama,
-#                              supaya bot tidak menggantung saat Kiro limit)
-#   3) kr/deepseek-3.2       — DeepSeek gratis via Kiro (kalau Claude tidak ada,
-#                              atau kalau HERMES_MODEL diisi eksplisit)
+# Pilih model pertama yang BENAR-BENAR bisa dipakai di 9Router (dicek via
+# /v1/models + UJI LIVE chat mini saat boot). Urutan preferensi:
+#   1) HERMES_MODEL        — kalau diisi dan lolos uji
+#   2) bai/qwen3.8-flash   — B.AI free-tier TERCEPAT; DEFAULT aktif (cek
+#                            2026-09-11: kr/* = 404 "No active credentials"
+#                            di 9Router Railway, jadi B.AI free-tier satu-
+#                            satunya yang hidup di router ini)
+#   3) bai/mimo-v2.5       — fallback B.AI free (kadang flaky)
+#   4) kr/claude-sonnet-4.5 — fallback Claude via Kiro (kalau provider kr
+#                             di-Connect lagi di 9Router)
+#   5) kr/deepseek-3.2     — fallback DeepSeek via Kiro
+#   6) bai/hy3, bai/glm-5.3-flash — fallback B.AI free (model reasoning; lebih
+#                            lambat, jawaban kadang kosong di budget token kecil)
+# PENTING soal B.AI (audit 2026-09-10/11): hanya model free-tier yang jalan
+#   dengan akun gratis — qwen3.8-flash, hy3, glm-5.3-flash, (mimo-v2.5 kadang).
+#   Model premium (semua gpt-5.x, claude, gemini, kimi, glm-5.1+, dst)
+#   TERDAFTAR di /v1/models tapi upstream balik 403 "Deposit required" dan
+#   9Router tidak fail-fast -> request HANG (bot Telegram "typing..." selamanya
+#   tidak pernah jawab). Maka validasi boot menguji live, bukan cuma cek daftar.
 # Kalau 9Router belum bisa dihubungi saat boot, validasi dilewati (tidak fatal).
 MODEL=""
-MODEL_PREFERENCE="kr/claude-sonnet-4.5 kr/deepseek-3.2"
+MODEL_PREFERENCE="bai/qwen3.8-flash bai/mimo-v2.5 kr/claude-sonnet-4.5 kr/deepseek-3.2 bai/hy3 bai/glm-5.3-flash"
 
 if [ "$LLM_MODE" = "nine_router" ] && command -v curl >/dev/null 2>&1; then
     MODELS_JSON=""
@@ -198,12 +210,25 @@ if [ "$LLM_MODE" = "nine_router" ] && command -v curl >/dev/null 2>&1; then
     done
 
     if [ -n "$MODELS_JSON" ]; then
+        # Kandidat harus TERDAFTAR dan LOLOS UJI LIVE (chat mini, max-time 40s).
+        # Ini menyaring model yang terdaftar tapi sebenarnya hang/premium
+        # (lihat catatan B.AI di atas): kalau request macet, kandidat dilewati.
         CHOSEN=""
         for cand in ${HERMES_MODEL:-} ${MODEL_PREFERENCE}; do
             [ -z "$cand" ] && continue
             if printf '%s' "$MODELS_JSON" | grep -q "\"${cand}\""; then
-                CHOSEN="$cand"
-                break
+                TEST_RESP=$(curl -fsS --max-time 40 \
+                    "${NINEROUTER_BASE_URL%/}/chat/completions" \
+                    -H "Authorization: Bearer ${NINEROUTER_API_KEY}" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"model\":\"${cand}\",\"max_tokens\":64,\"messages\":[{\"role\":\"user\",\"content\":\"ping\"}]}" \
+                    2>/dev/null || true)
+                if printf '%s' "$TEST_RESP" | grep -q '"object":"chat.completion"'; then
+                    CHOSEN="$cand"
+                    echo "[i] Kandidat '${cand}' lolos uji live (chat OK)."
+                    break
+                fi
+                echo "[!] '${cand}' terdaftar tapi GAGAL uji live (premium/hang/limit) -> coba kandidat berikutnya"
             fi
         done
         if [ -n "$CHOSEN" ]; then
@@ -217,17 +242,17 @@ if [ "$LLM_MODE" = "nine_router" ] && command -v curl >/dev/null 2>&1; then
             echo "[!] Tidak ada model dari daftar preferensi yang tersedia di 9Router."
             echo "    Kemungkinan provider (Kiro, dll) belum di-Connect atau kuota habis."
             echo "    Fix: dashboard 9Router -> Providers -> Connect/Reconnect, lalu Redeploy."
-            MODEL="${HERMES_MODEL:-kr/claude-sonnet-4.5}"
+            MODEL="${HERMES_MODEL:-bai/qwen3.8-flash}"
         fi
     else
         echo "[!] Daftar model dari 9Router tidak bisa diambil (9Router belum siap / tidak terjangkau)."
-        echo "    Validasi dilewati — pakai default aman kr/claude-sonnet-4.5 (bukan model yang belum terverifikasi)."
-        MODEL="${HERMES_MODEL:-kr/claude-sonnet-4.5}"
+        echo "    Validasi dilewati — pakai default aman bai/qwen3.8-flash (bukan model yang belum terverifikasi)."
+        MODEL="${HERMES_MODEL:-bai/qwen3.8-flash}"
     fi
 fi
 
 # Safety net: pastikan MODEL tidak pernah kosong sebelum ditulis ke config.
-[ -n "$MODEL" ] || MODEL="${HERMES_MODEL:-kr/claude-sonnet-4.5}"
+[ -n "$MODEL" ] || MODEL="${HERMES_MODEL:-bai/qwen3.8-flash}"
 echo "[i] Model final untuk config: ${MODEL}"
 
 # ---- 1. Verifikasi Hermes Agent ----------------------------------------------
@@ -427,7 +452,7 @@ echo "[i] Telegram access    : terbuka untuk semua user (TELEGRAM_ALLOW_ALL_USER
 
 if [ "$LLM_MODE" = "nine_router" ]; then
     # 9Router as the brain (OpenAI-compatible custom endpoint)
-    MODEL="${MODEL:-${HERMES_MODEL:-kr/claude-sonnet-4.5}}"
+    MODEL="${MODEL:-${HERMES_MODEL:-bai/qwen3.8-flash}}"
 
     # ---- Volume-aware config.yaml: tulis model section, pertahankan gateway ----
     _CFG_NEW=$(mktemp)
